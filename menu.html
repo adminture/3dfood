@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Menu — View in AR</title>
+<script src="menu-data.js"></script>
+<style>
+  :root{
+    --bg:#0f0f12; --card:#17171c; --accent:#ff5a36; --accent2:#ffb24a;
+    --text:#f4f1ea; --muted:#9a968f;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  header{ padding:22px 20px 10px; text-align:center; }
+  header h1{ font-size:1.4rem; }
+  header p{ color:var(--muted); font-size:0.82rem; margin-top:4px; }
+
+  .grid{
+    display:grid; grid-template-columns:1fr 1fr; gap:14px;
+    padding:16px; max-width:520px; margin:0 auto;
+  }
+  @media (min-width:640px){ .grid{ grid-template-columns:1fr 1fr 1fr; } }
+
+  .card{
+    background:var(--card); border-radius:16px; overflow:hidden;
+    text-decoration:none; color:var(--text); display:flex; flex-direction:column;
+    box-shadow:0 4px 14px rgba(0,0,0,0.3); transition:transform 0.15s;
+  }
+  .card:active{ transform:scale(0.97); }
+
+  .card-visual{
+    height:110px; display:flex; align-items:center; justify-content:center;
+    font-size:3rem; background:radial-gradient(circle at 50% 30%, #232228, #101013);
+  }
+  .card-visual img{ width:100%; height:100%; object-fit:cover; }
+
+  .card-body{ padding:12px 14px 14px; flex:1; display:flex; flex-direction:column; }
+  .card-body h3{ font-size:0.92rem; margin-bottom:4px; }
+  .card-body p{ font-size:0.72rem; color:var(--muted); line-height:1.3; flex:1; }
+  .card-price{ margin-top:8px; font-size:0.85rem; color:var(--accent2); font-weight:700; }
+
+  .ar-chip{
+    display:inline-block; margin-top:8px; font-size:0.65rem; color:var(--accent2);
+    border:1px solid var(--accent); padding:3px 8px; border-radius:999px; width:fit-content;
+  }
+
+  footer{ text-align:center; padding:20px; color:var(--muted); font-size:0.7rem; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🍽️ Our Menu</h1>
+  <p>Tap any dish to view it in AR on your table</p>
+</header>
+
+<div class="grid" id="menuGrid"></div>
+
+<footer>Scan the QR on the table anytime to reopen this menu</footer>
+
+<script>
+  const grid = document.getElementById('menuGrid');
+  MENU.forEach(item => {
+    const minPrice = Math.min(...item.sizes.map(s => s.price));
+    const card = document.createElement('a');
+    card.href = `item.html?id=${item.id}`;
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="card-visual">
+        ${item.thumb ? `<img src="${item.thumb}" alt="${item.name}">` : item.emoji}
+      </div>
+      <div class="card-body">
+        <h3>${item.name}</h3>
+        <p>${item.desc}</p>
+        <div class="card-price">From ₹${minPrice}</div>
+        <span class="ar-chip">⛶ View in AR</span>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+</script>
+
+</body>
+</html>

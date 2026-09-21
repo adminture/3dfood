@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>View in AR</title>
+<script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
+<script src="menu-data.js"></script>
+<style>
+  :root{
+    --bg:#0f0f12; --card:#17171c; --accent:#ff5a36; --accent2:#ffb24a;
+    --text:#f4f1ea; --muted:#9a968f;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+    display:flex; flex-direction:column; min-height:100%;
+  }
+  .topbar{
+    display:flex; align-items:center; gap:10px; padding:14px 16px 4px;
+  }
+  .back-btn{
+    background:#1f1f26; border:none; color:var(--text); width:34px; height:34px;
+    border-radius:50%; font-size:1.1rem; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  header{ padding:6px 20px 8px; text-align:center; flex:1; }
+  header h1{ font-size:1.2rem; }
+  header p{ color:var(--muted); font-size:0.78rem; margin-top:4px; }
+
+  .viewer-wrap{
+    flex:1; position:relative; margin:12px 16px; border-radius:18px; overflow:hidden;
+    background:radial-gradient(circle at 50% 30%, #232228, #101013);
+    min-height:300px;
+  }
+  model-viewer{ width:100%; height:100%; min-height:300px; }
+  .badge{
+    position:absolute; top:12px; left:12px; background:rgba(0,0,0,0.5);
+    padding:6px 12px; border-radius:999px; font-size:0.7rem; color:var(--accent2);
+    backdrop-filter:blur(6px);
+  }
+  .price-tag{
+    position:absolute; bottom:14px; left:14px; background:rgba(0,0,0,0.55);
+    padding:8px 14px; border-radius:12px; backdrop-filter:blur(6px);
+  }
+  .price-tag .price{ font-size:1.3rem; font-weight:700; color:var(--accent2); }
+  .price-tag .size-label{ font-size:0.75rem; color:var(--muted); }
+
+  .panel{ background:var(--card); margin:0 16px 16px; border-radius:18px; padding:18px 20px; }
+  .row-title{ font-size:0.8rem; color:var(--muted); margin-bottom:10px; text-transform:uppercase; letter-spacing:1px;}
+
+  .sizes{ display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap; }
+  .size-btn{
+    flex:1; min-width:90px; background:#1f1f26; border:1.5px solid transparent; color:var(--text);
+    padding:12px 0; border-radius:12px; font-size:0.9rem; font-weight:600; cursor:pointer; transition:0.15s;
+  }
+  .size-btn.active{ border-color:var(--accent); background:#2a1c17; color:var(--accent2); }
+  .size-btn .sub{ display:block; font-size:0.68rem; color:var(--muted); font-weight:400; margin-top:2px; }
+  .size-btn.active .sub{ color:var(--accent2); opacity:0.8; }
+
+  .qty-row{ display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+  .qty-controls{ display:flex; align-items:center; gap:14px; background:#1f1f26; border-radius:12px; padding:6px 14px;}
+  .qty-controls button{ width:30px; height:30px; border-radius:50%; border:none; background:var(--accent); color:#fff; font-size:1.1rem; cursor:pointer; }
+  .qty-controls span{ min-width:20px; text-align:center; font-weight:600; }
+
+  .ar-btn{
+    width:100%; padding:13px; border:1.5px solid var(--accent); background:transparent;
+    color:var(--accent2); border-radius:12px; font-size:0.85rem; font-weight:600; margin-bottom:12px; cursor:pointer;
+  }
+  .cart-btn{
+    width:100%; padding:15px; border:none; background:linear-gradient(90deg,var(--accent),var(--accent2));
+    color:#1a1000; font-size:1rem; font-weight:700; border-radius:12px; cursor:pointer;
+    display:flex; justify-content:space-between; align-items:center; padding-left:18px; padding-right:18px;
+  }
+  .toast{
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px);
+    background:#1f1f26; color:var(--accent2); padding:12px 22px; border-radius:999px;
+    font-size:0.85rem; opacity:0; transition:0.25s; pointer-events:none; z-index:50;
+    box-shadow:0 8px 24px rgba(0,0,0,0.4);
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+  .cart-badge{
+    position:fixed; top:calc(16px + env(safe-area-inset-top,0px)); right:16px; background:var(--accent);
+    color:#fff; width:26px; height:26px; border-radius:50%; display:flex;
+    align-items:center; justify-content:center; font-size:0.75rem; font-weight:700; z-index:40;
+  }
+  footer{ text-align:center; padding:10px; color:var(--muted); font-size:0.7rem; }
+  .not-found{ text-align:center; padding:60px 20px; color:var(--muted); }
+</style>
+</head>
+<body>
+
+<div class="cart-badge" id="cartBadge">0</div>
+
+<div id="app"></div>
+
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const itemId = params.get('id');
+  const item = MENU.find(m => m.id === itemId);
+  const app = document.getElementById('app');
+
+  if(!item){
+    app.innerHTML = `<div class="not-found">
+      <p>Dish not found.</p>
+      <p style="margin-top:10px;"><a href="menu.html" style="color:#ffb24a;">← Back to menu</a></p>
+    </div>`;
+  } else {
+    const defaultSizeIndex = Math.min(1, item.sizes.length - 1);
+    app.innerHTML = `
+      <div class="topbar">
+        <button class="back-btn" onclick="window.location.href='menu.html'">←</button>
+        <header>
+          <h1>${item.emoji} ${item.name}</h1>
+          <p>${item.desc}</p>
+        </header>
+      </div>
+
+      <div class="viewer-wrap">
+        <div class="badge">Tap ⛶ to view on your table</div>
+        <model-viewer
+          id="itemModel"
+          src="${item.model}"
+          ios-src="${item.iosModel || ''}"
+          alt="${item.name} 3D model"
+          ar
+          ar-modes="scene-viewer webxr quick-look"
+          ar-scale="auto"
+          camera-controls
+          auto-rotate
+          shadow-intensity="1.2"
+          environment-image="neutral"
+          exposure="1"
+          scale="${item.baseScale} ${item.baseScale} ${item.baseScale}">
+          <button slot="ar-button" class="ar-btn" style="position:absolute;bottom:14px;right:14px;left:auto;width:auto;padding:10px 16px;">
+            View on your table (AR)
+          </button>
+        </model-viewer>
+        <div class="price-tag">
+          <div class="price" id="priceDisplay"></div>
+          <div class="size-label" id="sizeLabelDisplay"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="row-title">Choose size</div>
+        <div class="sizes" id="sizeButtons"></div>
+
+        <div class="qty-row">
+          <div class="row-title" style="margin:0;">Quantity</div>
+          <div class="qty-controls">
+            <button id="qtyMinus">−</button>
+            <span id="qtyValue">1</span>
+            <button id="qtyPlus">+</button>
+          </div>
+        </div>
+
+        <button class="cart-btn" id="addToCart">
+          <span>Add to cart</span>
+          <span id="cartTotal"></span>
+        </button>
+      </div>
+
+      <div class="toast" id="toast">Added to cart ✓</div>
+      <footer>Prototype — scan the QR on the table to open this menu · runs 100% in-browser</footer>
+    `;
+
+    const model = document.getElementById('itemModel');
+    const sizeButtonsEl = document.getElementById('sizeButtons');
+    const priceDisplay = document.getElementById('priceDisplay');
+    const sizeLabelDisplay = document.getElementById('sizeLabelDisplay');
+    const cartTotal = document.getElementById('cartTotal');
+    const qtyValue = document.getElementById('qtyValue');
+    const cartBadge = document.getElementById('cartBadge');
+    const toast = document.getElementById('toast');
+
+    let state = { sizeIndex: defaultSizeIndex, qty: 1 };
+    let cartCount = parseInt(sessionStorage.getItem('cartCount') || '0');
+    cartBadge.textContent = cartCount;
+
+    function currentSize(){ return item.sizes[state.sizeIndex]; }
+
+    function render(){
+      const s = currentSize();
+      priceDisplay.textContent = '₹' + s.price;
+      sizeLabelDisplay.textContent = `${s.label} · ${s.sub}`;
+      cartTotal.textContent = '₹' + (s.price * state.qty);
+      model.scale = `${item.baseScale * s.scaleMultiplier} ${item.baseScale * s.scaleMultiplier} ${item.baseScale * s.scaleMultiplier}`;
+      qtyValue.textContent = state.qty;
+    }
+
+    item.sizes.forEach((s, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'size-btn' + (i === defaultSizeIndex ? ' active' : '');
+      btn.innerHTML = `${s.label}<span class="sub">${s.sub} · ₹${s.price}</span>`;
+      btn.addEventListener('click', () => {
+        sizeButtonsEl.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.sizeIndex = i;
+        render();
+      });
+      sizeButtonsEl.appendChild(btn);
+    });
+
+    document.getElementById('qtyPlus').addEventListener('click', () => { state.qty++; render(); });
+    document.getElementById('qtyMinus').addEventListener('click', () => { if(state.qty>1){ state.qty--; render(); } });
+
+    document.getElementById('addToCart').addEventListener('click', () => {
+      cartCount += state.qty;
+      sessionStorage.setItem('cartCount', cartCount);
+      cartBadge.textContent = cartCount;
+      toast.classList.add('show');
+      setTimeout(()=>toast.classList.remove('show'), 1600);
+    });
+
+    render();
+  }
+</script>
+
+</body>
+</html>
